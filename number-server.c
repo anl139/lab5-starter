@@ -84,15 +84,15 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     uint32_t chat_id = atoi(id); // Convert the id string to an integer
     if (chat_id == 0 || chat_id > chat_count) {
         printf("Error: Invalid chat ID %u.\n", chat_id);
-        return 1;  // Error: Invalid ID
+        return 0;  // Error: Invalid ID
     }
 
    if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > 15){
-	   return 1;
+	   return 0;
    }
 
     if (chat_list[chat_id - 1] == NULL){
-	    return 1;
+	    return 0;
     }
     // Check if num_reactions has reached the maximum allowed
     // Add the reaction directly in chats_list
@@ -105,7 +105,7 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     // Increment num_reactions directly in chats_list
     chat_list[chat_id - 1]->num_reactions++;
     printf("Reaction added to chat %u by user %s.\n", chat_id, username);
-    return 0;  // Success
+    return 1;  // Success
 }
 void reset() {
     // Free dynamically allocated memory if needed (currently no dynamic allocation for reactions)
@@ -120,6 +120,28 @@ void reset() {
     // Optionally reset the chat count or any other relevant variables
     chat_count = 0;
 }
+void url_decode(char *str) {
+    char *pstr = str;
+    char ch;
+    int i;
+    while (*str) {
+        if (*str == '%') {
+            // Convert %xx to character
+            if (sscanf(str + 1, "%2x", &i) == 1) {
+                ch = (char)i;
+                *pstr++ = ch;
+                str += 3;  // Skip the "%" and the two hex digits
+            }
+            else {
+                *pstr++ = *str++;  // If not a valid hex sequence, just copy it
+            }
+        } else {
+            *pstr++ = *str++;  // Just copy the character
+        }
+    }
+    *pstr = '\0';  // Null-terminate the string
+}
+
 int get_query_param(const char *query, const char *param_name, char *out_value, size_t max_len) {
     char search_key[50];
     snprintf(search_key, sizeof(search_key), "%s=", param_name);  // Format the key to look for "param_name="
@@ -139,7 +161,34 @@ int get_query_param(const char *query, const char *param_name, char *out_value, 
 
     strncpy(out_value, start, value_len);  // Copy value into output buffer
     out_value[value_len] = '\0';  // Null-terminate the output string
+    url_decode(out_value);
     return 1;
+}
+void handle_chats(int client_sock) {
+    char response[BUFFER_SIZE] = "";  // Initialize an empty response buffer
+    char temp[BUFFER_SIZE];           // Temporary buffer to format each chat line
+
+    // Iterate over each chat in chat_list and format the output
+    for (int i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
+        Chat *chat = chat_list[i];
+
+        // Format the chat message
+        snprintf(temp, sizeof(temp), "[#%u %s] %s: %s\n",
+                 chat->id, chat->timestamp, chat->user, chat->message);
+        strncat(response, temp, sizeof(response) - strlen(response) - 1);
+
+        // Add each reaction to the response with specific formatting
+        for (int j = 0; j < chat->num_reactions; j++) {
+            Reaction *reaction = &chat->reactions[j];
+            snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
+                     reaction->user, reaction->message);
+            strncat(response, temp, sizeof(response) - strlen(response) - 1);
+        }
+    }
+
+    // Send the response back to the client
+    write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));
+    write(client_sock, response, strlen(response));
 }
 void handle_post(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
@@ -163,7 +212,34 @@ void handle_post(int client_sock, const char *query) {
     write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));
     write(client_sock, response_buff, strlen(response_buff));
 }
+void handle_reaction(int client_sock, const char *query) {
+    char username[USERNAME_SIZE + 1] = {0};
+    char message[MESSAGE_SIZE + 1] = {0};
+    char id_str[10] = {0};
+    int chat_id;
+     if (!get_query_param(query, "user", username, sizeof(username)) ||
+        !get_query_param(query, "message", message, sizeof(message)) ||
+        !get_query_param(query, "id", id_str, sizeof(id_str))) {
+        write(client_sock, "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nMissing 'user', 'message', or 'id' parameter.", 89);
+        return;
+    }
 
+    // Convert id_str to an integer
+    chat_id = atoi(id_str);
+    if (chat_id <= 0) {
+        write(client_sock, "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nInvalid 'id' parameter.", 67);
+        return;
+    }
+
+    // Add the reaction to the specified chat
+    if (!add_reaction(username, message, id_str)) {
+        handle_400(client_sock, "Unable to add reaction: max reactions reached or invalid data.");
+        return;
+    }
+
+    // Respond with the updated chat list
+    handle_chats(client_sock);
+}
 
 void handle_404(int client_sock, char *path)  {
     printf("SERVER LOG: Got request for unrecognized path \"%s\"\n", path);
@@ -207,8 +283,6 @@ void handle_response(char *request, int client_sock) {
     if (query) {
         *query++ = '\0';  // Null-terminate path and set query to parameters
     }
-    /* "/" – shows “Current number: ____”
-        "/increment" – adds 1 to number and shows “Incremented to: _____” */
     // How to write the if statements to detect which path we have?
     if(strcmp(path, "/") == 0) {
       handle_root(client_sock);
@@ -219,7 +293,15 @@ void handle_response(char *request, int client_sock) {
       return;
     }
     else if(strcmp(path,"/post")== 0 && query){
+	    handle_post(client_sock,query);
 	    return;
+    }else if(strcmp(path,"/chat") == 0){
+	   handle_chats(client_sock);
+	   return;
+    }
+     else if(strcmp(path,"/react")== 0){
+	     handle_reaction(client_sock,query);
+	     return;
     } else {
       handle_404(client_sock, path);
     }
@@ -230,21 +312,9 @@ void handle_response(char *request, int client_sock) {
 }
 
 int main(int argc, char *argv[]) {
-   // int port = 0;
-   // if(argc >= 2) { // if called with a port number, use that
-      //  port = atoi(argv[1]);
-   // }
-
-   // start_server(&handle_response, port);
-    add_chat("alice", "Hello world");
-    add_reaction("bob", "nice", "1"); 
- if (chat_list[0]->id != 0) {  // Assuming an id of 0 means the chat hasn't been added yet
-        printf("First chat in list:\n");
-        printf("ID: %u\n", chat_list[0]->id);
-        printf("User: %s\n", chat_list[0]->user);
-        printf("Message: %s\n", chat_list[0]->message);
-        printf("Timestamp: %s\n", chat_list[0]->timestamp);
-	printf("Number of Reactions: %d\n", chat_list[0]->num_reactions);
-	printf("Reaction: %s", chat_list[0]->reactions[0].user);
-	printf(" %s", chat_list[0]->reactions[0].message);
-    }}
+   int port = 0;
+   if(argc >= 2) { // if called with a port number, use that
+        port = atoi(argv[1]);
+    }
+   start_server(&handle_response, port);  
+ }
