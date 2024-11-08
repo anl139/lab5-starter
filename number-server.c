@@ -182,7 +182,7 @@ void respond_with_chats(int client) {
 
         // Format the main chat message
         snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
-                 chat->id, chat->timestamp, chat->user, chat->message);
+                 i+1, chat->timestamp, chat->user, chat->message);
 
         // Append the formatted chat line to the response
         strncat(response, temp, sizeof(response) - strlen(response) - 1);
