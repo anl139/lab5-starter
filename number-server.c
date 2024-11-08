@@ -15,23 +15,25 @@ char const HTTP_404_NOT_FOUND[] = "HTTP/1.1 404 Not Found\r\nContent-Type: text/
 char const HTTP_200_OK[] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
 char const HTTP_400_BAD_REQUEST[] = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\n";
 typedef struct {
-    char user[USERNAME_SIZE];
-    char message[REACTION_MESSAGE_SIZE];  // Example reaction types like "like" or "love"
+    char user[USERNAME_SIZE+1];
+    char message[REACTION_MESSAGE_SIZE+1];  // Example reaction types like "like" or "love"
 } Reaction;
 
 typedef struct {
     uint32_t id;
-    char user[USERNAME_SIZE];
-    char message[MESSAGE_SIZE];
+    char user[USERNAME_SIZE+1];
+    char message[MESSAGE_SIZE+1];
     char timestamp[TIMESTAMP_SIZE];
     uint32_t num_reactions; 
     Reaction reactions[MAX_REACTIONS];
 } Chat;
 
+
 Chat *chat_list[MAX_CHATS] = {NULL};
 uint32_t current_id = 1;  // Initialize current_id as 1
 int chat_count = 0;
-int reaction_count = 0;
+
+
 void handle_400(int client_sock, const char *error_msg) {
     char response_buff[BUFFER_SIZE];
     snprintf(response_buff, BUFFER_SIZE, "Error 400: %s\n", error_msg);
@@ -175,7 +177,7 @@ void handle_chats(int client_sock) {
         Chat *chat = chat_list[i];
 
         // Format the chat message
-        snprintf(temp, sizeof(temp), "[#%u %s] %s: %s\n",
+        snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
                  chat->id, chat->timestamp, chat->user, chat->message);
         strncat(response, temp, sizeof(response) - strlen(response) - 1);
 
