@@ -170,29 +170,24 @@ int get_query_param(const char *query, const char *param_name, char *out_value, 
 void handle_chats(int client_sock) {
     char response[BUFFER_SIZE] = "";  // Initialize an empty response buffer
     char temp[BUFFER_SIZE];           // Temporary buffer to format each chat line
-    int i;
+    int i = 0;
     int j;
     // Iterate over each chat in chat_list and format the output
-    for (i = 0; i < MAX_CHATS && (chat_list[i] != NULL); i++) {
-
-        // Format the chat message
+    while ((i < MAX_CHATS) && (chat_list[i] != NULL)) {
+        // Format the chat message directly using chat_list[i]
         snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
                  chat_list[i]->id, chat_list[i]->timestamp, chat_list[i]->user, chat_list[i]->message);
-
-        // Ensure there's enough space before appending to the response buffer
-        if (strlen(response) + strlen(temp) < sizeof(response)) {
-            strncat(response, temp, sizeof(response) - strlen(response) - 1);
-        }
+        strncat(response, temp, sizeof(response) - strlen(response) - 1);
 
         // Add each reaction to the response with specific formatting
-        for (j = 0; j <  chat_list[i]->num_reactions &&(chat_list[i] != NULL); j++) {
+        for (j = 0; j < chat_list[i]->num_reactions; j++) {
             Reaction *reaction = &chat_list[i]->reactions[j];
             snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
                      reaction->user, reaction->message);
-            if (strlen(response) + strlen(temp) < sizeof(response)) {
-                strncat(response, temp, sizeof(response) - strlen(response) - 1);
-            }
+            strncat(response, temp, sizeof(response) - strlen(response) - 1);
         }
+
+        i++;  // Increment the index for the next iteration
     }
 
     // Send the response back to the client
