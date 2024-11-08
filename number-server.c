@@ -84,16 +84,19 @@ uint8_t add_chat(char *username, char *message) {
     return 1;
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
-    uint32_t chat_id = atoi(id); // Convert the id string to an integer
+	uint32_t chat_id = atoi(id); // Convert the id string to an integer
+	char response_buff[BUFFER_SIZE];
     if (chat_id == 0 || chat_id > chat_count) {
+	    snprintf(response_buff, BUFFER_SIZE, "Error 1: \n");
         return 0;  // Error: Invalid ID
     }
-
-   if (strlen(username) > 15 || strlen(reaction_message) > 15){
+   if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
+	   snprintf(response_buff, BUFFER_SIZE, "Error2:\n");
 	   return 0;
    }
 
     if (chat_list[chat_id - 1] == NULL){
+	    snprintf(response_buff, BUFFER_SIZE, "Error 3:\n");
 	    return 0;
     }
     // Check if num_reactions has reached the maximum allowed
@@ -177,16 +180,22 @@ void handle_chats(int client_sock) {
         Chat *chat = chat_list[i];
 
         // Format the chat message
-        snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
+        snprintf(temp, sizeof(temp), "[#%u %s] %s: %s\n",
                  chat->id, chat->timestamp, chat->user, chat->message);
-        strncat(response, temp, sizeof(response) - strlen(response) - 1);
+
+        // Ensure there's enough space before appending to the response buffer
+        if (strlen(response) + strlen(temp) < sizeof(response)) {
+            strncat(response, temp, sizeof(response) - strlen(response) - 1);
+        }
 
         // Add each reaction to the response with specific formatting
         for (int j = 0; j < chat->num_reactions; j++) {
             Reaction *reaction = &chat->reactions[j];
             snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
                      reaction->user, reaction->message);
-            strncat(response, temp, sizeof(response) - strlen(response) - 1);
+            if (strlen(response) + strlen(temp) < sizeof(response)) {
+                strncat(response, temp, sizeof(response) - strlen(response) - 1);
+            }
         }
     }
 
@@ -217,8 +226,8 @@ void handle_post(int client_sock, const char *query) {
 void handle_reaction(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
     char message[MESSAGE_SIZE + 1] = {0};
-    char id_str[10] = {0};
-    int chat_id;
+    char id_str[] = {0};
+    int8_t chat_id;
      if (!get_query_param(query, "user", username, sizeof(username)) ||
         !get_query_param(query, "message", message, sizeof(message)) ||
         !get_query_param(query, "id", id_str, sizeof(id_str))) {
