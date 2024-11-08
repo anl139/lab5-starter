@@ -21,8 +21,8 @@ typedef struct {
 
 typedef struct {
     uint32_t id;
-    char user[USERNAME_SIZE];
-    char message[MESSAGE_SIZE];
+    char user[USERNAME_SIZE+1];
+    char message[MESSAGE_SIZE+1];
     char timestamp[TIMESTAMP_SIZE];
     uint32_t num_reactions; 
     Reaction reactions[MAX_REACTIONS];
@@ -30,8 +30,8 @@ typedef struct {
 
 
 Chat *chat_list[MAX_CHATS] = {NULL};
-uint32_t current_id = 1;  // Initialize current_id as 1
-int chat_count = 0;
+uint8_t current_id = 1;  // Initialize current_id as 1
+uint8_t chat_count = 0;
 
 
 void handle_400(int client_sock, const char *error_msg) {
@@ -84,7 +84,7 @@ uint8_t add_chat(char *username, char *message) {
     return 1;
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
-	uint32_t chat_id = atoi(id); // Convert the id string to an integer
+	uint8_t chat_id = atoi(id); // Convert the id string to an integer
     if (chat_id == 0 || chat_id > chat_count) {
         return 0;  // Error: Invalid ID
     }
@@ -146,7 +146,7 @@ void url_decode(char *str) {
 }
 
 int get_query_param(const char *query, const char *param_name, char *out_value, size_t max_len) {
-    char search_key[50];
+    char search_key[100];
     snprintf(search_key, sizeof(search_key), "%s=", param_name);  // Format the key to look for "param_name="
 
     const char *start = strstr(query, search_key);  // Find the position of "param_name="
@@ -173,12 +173,11 @@ void handle_chats(int client_sock) {
     int i;
     int j;
     // Iterate over each chat in chat_list and format the output
-    for (i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
-        Chat *chat = chat_list[i];
+    for (i = 0; i < MAX_CHATS && (chat_list[i] != NULL); i++) {
 
         // Format the chat message
         snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
-                 chat->id, chat->timestamp, chat->user, chat->message);
+                 chat_list[i]->id, chat_list[i]->timestamp, chat_list[i]->user, chat_list[i]->message);
 
         // Ensure there's enough space before appending to the response buffer
         if (strlen(response) + strlen(temp) < sizeof(response)) {
@@ -186,8 +185,8 @@ void handle_chats(int client_sock) {
         }
 
         // Add each reaction to the response with specific formatting
-        for (j = 0; j < chat->num_reactions; j++) {
-            Reaction *reaction = &chat->reactions[j];
+        for (j = 0; j <  chat_list[i]->num_reactions &&(chat_list[i] != NULL); j++) {
+            Reaction *reaction = &chat_list[i]->reactions[j];
             snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
                      reaction->user, reaction->message);
             if (strlen(response) + strlen(temp) < sizeof(response)) {
@@ -295,7 +294,7 @@ void handle_response(char *request, int client_sock) {
 	   handle_chats(client_sock);
 	   return;
     }
-     else if(strcmp(path,"/react")== 0){
+     else if(strcmp(path,"/react")== 0 && query){
 	     handle_reaction(client_sock,query);
 	     return;
     }else if(strcmp(path,"/reset") == 0){
