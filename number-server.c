@@ -30,7 +30,6 @@ typedef struct {
 
 
 static Chat *chat_list[MAX_CHATS] = {NULL};
-static uint32_t current_id = 1;  // To ensure IDs start from 1
 static int chat_count = 0;  // Count of chats in the list
 
 
@@ -64,7 +63,8 @@ uint8_t add_chat(char *username, char *message) {
     }
 
     // Set the chat ID and update current_id
-    new_chat->id = current_id++;
+
+    new_chat->id = (chat_count+1);
     
     // Copy username and message to new chat
     strncpy(new_chat->user, username, USERNAME_SIZE);
@@ -85,7 +85,10 @@ uint8_t add_chat(char *username, char *message) {
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
 	int chat_id = atoi(id); // Convert the id string to an integer
-   if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
+	if (chat_id == 0 || chat_id-1 > chat_count) {
+        return 0;  // Error: Invalid ID
+      	}
+       	if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
 	   return 0;
    }
 
@@ -115,7 +118,6 @@ void handle_reset(int client) {
 
     // Reset global chat count and reaction counters
     chat_count = 0;
-    current_id = 1;
     // Respond with an HTTP success message and an empty body
     write(client, HTTP_200_OK, strlen(HTTP_200_OK));
 }
@@ -295,8 +297,10 @@ void handle_response(char *request, int client_sock) {
 	     return;
     }else if(strcmp(path,"/reset") == 0){
 	   handle_reset(client_sock);
+	   return;
     } else {
       handle_404(client_sock, path);
+      return;
     }
 
     // strstr if there might be shared prefixes, like looking for "/post" in the PA
