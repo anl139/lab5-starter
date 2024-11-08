@@ -21,8 +21,8 @@ typedef struct {
 
 typedef struct {
     uint32_t id;
-    char user[USERNAME_SIZE+1];
-    char message[MESSAGE_SIZE+1];
+    char user[USERNAME_SIZE];
+    char message[MESSAGE_SIZE];
     char timestamp[TIMESTAMP_SIZE];
     uint32_t num_reactions; 
     Reaction reactions[MAX_REACTIONS];
@@ -85,18 +85,14 @@ uint8_t add_chat(char *username, char *message) {
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
 	uint32_t chat_id = atoi(id); // Convert the id string to an integer
-	char response_buff[BUFFER_SIZE];
     if (chat_id == 0 || chat_id > chat_count) {
-	    snprintf(response_buff, BUFFER_SIZE, "Error 1: \n");
         return 0;  // Error: Invalid ID
     }
    if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
-	   snprintf(response_buff, BUFFER_SIZE, "Error2:\n");
 	   return 0;
    }
 
-    if (chat_list[chat_id - 1] == NULL){
-	    snprintf(response_buff, BUFFER_SIZE, "Error 3:\n");
+    if (chat_list[chat_id -1]->num_reactions > REACTION_SIZE){
 	    return 0;
     }
     // Check if num_reactions has reached the maximum allowed
@@ -109,7 +105,6 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
 
     // Increment num_reactions directly in chats_list
     chat_list[chat_id - 1]->num_reactions++;
-    printf("Reaction added to chat %u by user %s.\n", chat_id, username);
     return 1;  // Success
 }
 void handle_reset(int client) {
@@ -117,7 +112,8 @@ void handle_reset(int client) {
 	int j;
     // Free each chat and its associated reactions
     for (i = 0; i < chat_count; i++) {
-        free(chat_list[i]);  // Free each chat
+        free(chat_list[i]);  // Free each chati
+	chat_list[i] = NULL;
     }
 
     // Reset global chat count and reaction counters
@@ -174,13 +170,14 @@ int get_query_param(const char *query, const char *param_name, char *out_value, 
 void handle_chats(int client_sock) {
     char response[BUFFER_SIZE] = "";  // Initialize an empty response buffer
     char temp[BUFFER_SIZE];           // Temporary buffer to format each chat line
-
+    int i;
+    int j;
     // Iterate over each chat in chat_list and format the output
-    for (int i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
+    for (i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
         Chat *chat = chat_list[i];
 
         // Format the chat message
-        snprintf(temp, sizeof(temp), "[#%u %s] %s: %s\n",
+        snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
                  chat->id, chat->timestamp, chat->user, chat->message);
 
         // Ensure there's enough space before appending to the response buffer
@@ -189,7 +186,7 @@ void handle_chats(int client_sock) {
         }
 
         // Add each reaction to the response with specific formatting
-        for (int j = 0; j < chat->num_reactions; j++) {
+        for (j = 0; j < chat->num_reactions; j++) {
             Reaction *reaction = &chat->reactions[j];
             snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
                      reaction->user, reaction->message);
