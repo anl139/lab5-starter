@@ -260,14 +260,6 @@ void handle_root(int client_sock) {
   write(client_sock, message, strlen(message));
 }
 
-void handle_increment(int client_sock) {
-  char message[BUFFER_SIZE];
-  num += 1;
-  snprintf(message, BUFFER_SIZE, "Incremented to: %d\n", num);
-  write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));  
-  write(client_sock, message, strlen(message));
-}
-
 void handle_response(char *request, int client_sock) {
     char path[256];
     char *query = NULL;
@@ -286,10 +278,6 @@ void handle_response(char *request, int client_sock) {
     // How to write the if statements to detect which path we have?
     if(strcmp(path, "/") == 0) {
       handle_root(client_sock);
-      return;
-    }
-    else if(strcmp(path, "/increment") == 0) {
-      handle_increment(client_sock);
       return;
     }
     else if(strcmp(path,"/post")== 0 && query){
