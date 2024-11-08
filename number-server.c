@@ -167,32 +167,38 @@ int get_query_param(const char *query, const char *param_name, char *out_value, 
     url_decode(out_value);
     return 1;
 }
-void handle_chats(int client_sock) {
-    char response[BUFFER_SIZE] = "";  // Initialize an empty response buffer
-    char temp[BUFFER_SIZE];           // Temporary buffer to format each chat line
-    int i = 0;
+void respond_with_chats(int client) {
+    char response[BUFFER_SIZE] = "";     // Buffer for formatting the entire response
+    char temp[BUFFER_SIZE];          // Temporary buffer for each formatted line
+    int i;
     int j;
-    // Iterate over each chat in chat_list and format the output
-    while ((i < MAX_CHATS) && (chat_list[i] != NULL)) {
-        // Format the chat message directly using chat_list[i]
+    // Start with an empty response
+     write(client, "HTTP/1.1 200 OK\r\n", 17);
+    write(client, "Content-Type: text/plain\r\n\r\n", 26);  // Extra blank line to end headers
+
+    // Loop through chat_list to construct the response
+    for (i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
+        Chat *chat = chat_list[i];
+
+        // Format the main chat message
         snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
-                 chat_list[i]->id, chat_list[i]->timestamp, chat_list[i]->user, chat_list[i]->message);
+                 chat->id, chat->timestamp, chat->user, chat->message);
+
+        // Append the formatted chat line to the response
         strncat(response, temp, sizeof(response) - strlen(response) - 1);
 
-        // Add each reaction to the response with specific formatting
-        for (j = 0; j < chat_list[i]->num_reactions; j++) {
-            Reaction *reaction = &chat_list[i]->reactions[j];
-            snprintf(temp, sizeof(temp), "                    (%s)  %s\n",
+        // Add each reaction, if any
+        for (j = 0; j < chat->num_reactions; j++) {
+            Reaction *reaction = &chat->reactions[j];
+            snprintf(temp, sizeof(temp), "                    (%s) %s\n",
                      reaction->user, reaction->message);
             strncat(response, temp, sizeof(response) - strlen(response) - 1);
         }
-
-        i++;  // Increment the index for the next iteration
     }
 
-    // Send the response back to the client
-    write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));
-    write(client_sock, response, strlen(response));
+    // Send the formatted response back to the client
+    write(client, HTTP_200_OK, strlen(HTTP_200_OK));
+    write(client, response, strlen(response));
 }
 void handle_post(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
@@ -211,13 +217,13 @@ void handle_post(int client_sock, const char *query) {
     }
 
     // Respond with success
-    handle_chats(client_sock);
+   respond_with_chats(client_sock);
     
 }
 void handle_reaction(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
     char message[MESSAGE_SIZE + 1] = {0};
-    char id_str[4] = {0};
+    char id_str[10] = {0};
     int8_t chat_id;
      if (!get_query_param(query, "user", username, sizeof(username)) ||
         !get_query_param(query, "message", message, sizeof(message)) ||
@@ -240,9 +246,14 @@ void handle_reaction(int client_sock, const char *query) {
     }
 
     // Respond with the updated chat list
-    handle_chats(client_sock);
+    respond_with_chats(client_sock);
 }
-
+void handle_root(int client_sock) {
+  char message[BUFFER_SIZE];
+  snprintf(message, BUFFER_SIZE, "Current number: %d\n", num);
+  write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));  
+  write(client_sock, message, strlen(message));
+}
 void handle_404(int client_sock, char *path)  {
     printf("SERVER LOG: Got request for unrecognized path \"%s\"\n", path);
 
@@ -253,13 +264,6 @@ void handle_404(int client_sock, char *path)  {
     // TODO: send response back to client?
     write(client_sock, HTTP_404_NOT_FOUND, strlen(HTTP_404_NOT_FOUND));
     write(client_sock, response_buff, strlen(response_buff));
-}
-
-void handle_root(int client_sock) {
-  char message[BUFFER_SIZE];
-  snprintf(message, BUFFER_SIZE, "Current number: %d\n", num);
-  write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));  
-  write(client_sock, message, strlen(message));
 }
 
 void handle_response(char *request, int client_sock) {
@@ -277,16 +281,16 @@ void handle_response(char *request, int client_sock) {
     if (query) {
         *query++ = '\0';  // Null-terminate path and set query to parameters
     }
-    // How to write the if statements to detect which path we have?
-    if(strcmp(path, "/") == 0) {
+    // How to write the if statements to detect which path we have?i
+     if(strcmp(path, "/") == 0) {
       handle_root(client_sock);
       return;
     }
-    else if(strcmp(path,"/post")== 0 && query){
+    if(strcmp(path,"/post")== 0 && query){
 	    handle_post(client_sock,query);
 	    return;
     }else if(strcmp(path,"/chats") == 0){
-	   handle_chats(client_sock);
+	   respond_with_chats(client_sock);
 	   return;
     }
      else if(strcmp(path,"/react")== 0 && query){
