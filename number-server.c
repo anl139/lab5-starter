@@ -57,14 +57,13 @@ uint8_t add_chat(char *username, char *message) {
     }
 
     // Allocate memory for the new chat
-    Chat *new_chat = (Chat *)malloc(sizeof(Chat));
+    Chat *new_chat = malloc(sizeof(Chat));
     if (new_chat == NULL) {
         return 0;  // Allocation failed
     }
 
     // Set the chat ID and update current_id
-
-    new_chat->id = (chat_count+1);
+    (*new_chat).id = (chat_count+1);
     
     // Copy username and message to new chat
     strncpy(new_chat->user, username, USERNAME_SIZE);
@@ -79,7 +78,8 @@ uint8_t add_chat(char *username, char *message) {
     new_chat->num_reactions = 0;
 
     // Add the new chat to the chat list
-    chat_list[chat_count++] = new_chat;
+    chat_list[chat_count] = new_chat;
+    chat_count++;
 
     return 1;
 }
@@ -176,9 +176,9 @@ void respond_with_chats(int client) {
     write(client, "Content-Type: text/plain\r\n\r\n", 26);  // Extra blank line to end headers
 
     // Loop through chat_list to construct the response
-    for (i = 0; i < MAX_CHATS && chat_list[i] != NULL; i++) {
+    for (i = 0; i < MAX_CHATS; i++) {
         Chat *chat = chat_list[i];
-
+	if(chat != NULL){
         // Format the main chat message
         snprintf(temp, sizeof(temp), "[#%d %s] %s: %s\n",
                  i+1, chat->timestamp, chat->user, chat->message);
@@ -193,6 +193,7 @@ void respond_with_chats(int client) {
                      reaction->user, reaction->message);
             strncat(response, temp, sizeof(response) - strlen(response) - 1);
         }
+    }
     }
 
     // Send the formatted response back to the client
@@ -309,9 +310,10 @@ void handle_response(char *request, int client_sock) {
 }
 
 int main(int argc, char *argv[]) {
-  int port = 0;
+  int port = 8000;
    if(argc >= 2) { // if called with a port number, use that
-        port = atoi(argv[1]);
-    }
-   start_server(&handle_response, port);  
+      port = atoi(argv[1]);
+   }
+   start_server(&handle_response, port); 
+   
  }
