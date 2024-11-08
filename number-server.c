@@ -2,11 +2,12 @@
 #include <string.h>
 
 int num = 0; // the state of the server (the hello world version of chats list
-#define USERNAME_SIZE 50
-#define MESSAGE_SIZE 200
+#define USERNAME_SIZE 15
+#define MESSAGE_SIZE 255
 #define TIMESTAMP_SIZE 20
 #define MAX_REACTIONS 10
-#define REACTION_SIZE 200
+#define REACTION_SIZE 100
+#define REACTION_MESSAGE_SIZE 15
 
 // Assuming there's an array or linked list of chats:
 #define MAX_CHATS 100
@@ -14,14 +15,14 @@ char const HTTP_404_NOT_FOUND[] = "HTTP/1.1 404 Not Found\r\nContent-Type: text/
 char const HTTP_200_OK[] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
 char const HTTP_400_BAD_REQUEST[] = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\n";
 typedef struct {
-    char user[USERNAME_SIZE + 1];
-    char message[15];  // Example reaction types like "like" or "love"
+    char user[USERNAME_SIZE];
+    char message[REACTION_MESSAGE_SIZE];  // Example reaction types like "like" or "love"
 } Reaction;
 
 typedef struct {
     uint32_t id;
-    char user[USERNAME_SIZE+ 1];
-    char message[MESSAGE_SIZE + 1];
+    char user[USERNAME_SIZE];
+    char message[MESSAGE_SIZE];
     char timestamp[TIMESTAMP_SIZE];
     uint32_t num_reactions; 
     Reaction reactions[MAX_REACTIONS];
@@ -83,11 +84,10 @@ uint8_t add_chat(char *username, char *message) {
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     uint32_t chat_id = atoi(id); // Convert the id string to an integer
     if (chat_id == 0 || chat_id > chat_count) {
-        printf("Error: Invalid chat ID %u.\n", chat_id);
         return 0;  // Error: Invalid ID
     }
 
-   if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > 15){
+   if (strlen(username) > 15 || strlen(reaction_message) > 15){
 	   return 0;
    }
 
@@ -96,7 +96,7 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     }
     // Check if num_reactions has reached the maximum allowed
     // Add the reaction directly in chats_list
-    Reaction *new_reaction = &chat_list[chat_id - 1]->reactions[0];
+    Reaction *new_reaction = &chat_list[chat_id - 1]->reactions[chat_list[chat_id - 1]->num_reactions];
     strncpy(new_reaction->user, username, USERNAME_SIZE);
     new_reaction->user[USERNAME_SIZE] = '\0';  // Ensure null termination
     strncpy(new_reaction->message, reaction_message, 15);
@@ -107,19 +107,21 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     printf("Reaction added to chat %u by user %s.\n", chat_id, username);
     return 1;  // Success
 }
-void reset() {
-    // Free dynamically allocated memory if needed (currently no dynamic allocation for reactions)
-    int i;
-   for (i = 0; i < MAX_CHATS; i++) {
-        if (chat_list[i] != NULL) {
-            free(chat_list[i]);  // Free the memory allocated for the chat
-            chat_list[i] = NULL;  // Reset the pointer to NULL
-        }
+void handle_reset(int client) {
+	int i;
+	int j;
+    // Free each chat and its associated reactions
+    for (i = 0; i < chat_count; i++) {
+        free(chat_list[i]);  // Free each chat
     }
 
-    // Optionally reset the chat count or any other relevant variables
+    // Reset global chat count and reaction counters
     chat_count = 0;
+
+    // Respond with an HTTP success message and an empty body
+    write(client, HTTP_200_OK, strlen(HTTP_200_OK));
 }
+
 void url_decode(char *str) {
     char *pstr = str;
     char ch;
@@ -207,10 +209,8 @@ void handle_post(int client_sock, const char *query) {
     }
 
     // Respond with success
-    char response_buff[BUFFER_SIZE];
-    snprintf(response_buff, BUFFER_SIZE, "Chat by %s added: %s\n", username, message);
-    write(client_sock, HTTP_200_OK, strlen(HTTP_200_OK));
-    write(client_sock, response_buff, strlen(response_buff));
+    handle_chats(client_sock);
+    
 }
 void handle_reaction(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
@@ -295,13 +295,15 @@ void handle_response(char *request, int client_sock) {
     else if(strcmp(path,"/post")== 0 && query){
 	    handle_post(client_sock,query);
 	    return;
-    }else if(strcmp(path,"/chat") == 0){
+    }else if(strcmp(path,"/chats") == 0){
 	   handle_chats(client_sock);
 	   return;
     }
      else if(strcmp(path,"/react")== 0){
 	     handle_reaction(client_sock,query);
 	     return;
+    }else if(strcmp(path,"/reset") == 0){
+	   handle_reset(client_sock);
     } else {
       handle_404(client_sock, path);
     }
