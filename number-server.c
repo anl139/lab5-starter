@@ -29,9 +29,9 @@ typedef struct {
 } Chat;
 
 
-Chat *chat_list[MAX_CHATS] = {NULL};
-unsigned int current_id = 1;  // To ensure IDs start from 1
-int chat_count = 0;  // Count of chats in the list
+static Chat *chat_list[MAX_CHATS] = {NULL};
+static uint32_t current_id = 1;  // To ensure IDs start from 1
+static int chat_count = 0;  // Count of chats in the list
 
 
 void handle_400(int client_sock, const char *error_msg) {
@@ -67,9 +67,9 @@ uint8_t add_chat(char *username, char *message) {
     new_chat->id = current_id++;
     
     // Copy username and message to new chat
-    strncpy(new_chat->user, username, USERNAME_SIZE);
+    strncpy(new_chat->user, username, USERNAME_SIZE+1);
     new_chat->user[USERNAME_SIZE] = '\0';
-    strncpy(new_chat->message, message, MESSAGE_SIZE);
+    strncpy(new_chat->message, message, MESSAGE_SIZE+1);
     new_chat->message[MESSAGE_SIZE] = '\0';
 
     // Set the current timestamp
@@ -98,10 +98,10 @@ uint8_t add_reaction(char* username, char* reaction_message, char* id) {
     // Check if num_reactions has reached the maximum allowed
     // Add the reaction directly in chats_list
     Reaction *new_reaction = &chat_list[chat_id - 1]->reactions[chat_list[chat_id - 1]->num_reactions];
-    strncpy(new_reaction->user, username, USERNAME_SIZE);
+    strncpy(new_reaction->user, username, USERNAME_SIZE+1);
     new_reaction->user[USERNAME_SIZE] = '\0';  // Ensure null termination
-    strncpy(new_reaction->message, reaction_message, 15);
-    new_reaction->message[15] = '\0';   // Ensure null termination
+    strncpy(new_reaction->message, reaction_message, REACTION_MESSAGE_SIZE + 1);
+    new_reaction->message[REACTION_MESSAGE_SIZE] = '\0';   // Ensure null termination
 
     // Increment num_reactions directly in chats_list
     chat_list[chat_id - 1]->num_reactions++;
