@@ -85,9 +85,6 @@ uint8_t add_chat(char *username, char *message) {
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
 	int chat_id = atoi(id); // Convert the id string to an integer
-	if (chat_id == 0 || chat_id > chat_count) {
-        return 0;  // Error: Invalid ID
-    }
    if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
 	   return 0;
    }
@@ -308,34 +305,9 @@ void handle_response(char *request, int client_sock) {
 }
 
 int main(int argc, char *argv[]) {
-  // int port = 0;
-   //if(argc >= 2) { // if called with a port number, use that
-    //    port = atoi(argv[1]);
-   // }
-  // start_server(&handle_response, port);  
-  char query1[] = "/post?user=Joe&message=I'm%20Joe";
-    char query2[] = "/react?user=Aaron&message=...&id=3";
-  int MAX_LEN = 400;  
-    char out_value[MAX_LEN];
-
-    // Test 1: Extract 'user' from query1
-    if (get_query_param(query1, "user", out_value, MAX_LEN)) {
-        printf("Test 1 - User: %s\n", out_value);  // Expected: "Joe"
-    } else {
-        printf("Test 1 - Failed to get 'user' param\n");
+  int port = 0;
+   if(argc >= 2) { // if called with a port number, use that
+        port = atoi(argv[1]);
     }
-
-    // Test 2: Extract 'message' from query1
-    if (get_query_param(query1, "message", out_value, MAX_LEN)) {
-        printf("Test 2 - Message: %s\n", out_value);  // Expected: "I'm Joe"
-    } else {
-        printf("Test 2 - Failed to get 'message' param\n");
-    }
-
-    // Test 3: Extract 'id' from query2
-    if (get_query_param(query2, "id", out_value, MAX_LEN)) {
-        printf("Test 3 - ID: %s\n", out_value);  // Expected: "3"
-    } else {
-        printf("Test 3 - Failed to get 'id' param\n");
-    }
+   start_server(&handle_response, port);  
  }
