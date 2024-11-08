@@ -226,7 +226,7 @@ void handle_post(int client_sock, const char *query) {
 void handle_reaction(int client_sock, const char *query) {
     char username[USERNAME_SIZE + 1] = {0};
     char message[MESSAGE_SIZE + 1] = {0};
-    char id_str[] = {0};
+    char id_str[4] = {0};
     int8_t chat_id;
      if (!get_query_param(query, "user", username, sizeof(username)) ||
         !get_query_param(query, "message", message, sizeof(message)) ||
