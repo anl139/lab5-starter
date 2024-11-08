@@ -30,8 +30,8 @@ typedef struct {
 
 
 Chat *chat_list[MAX_CHATS] = {NULL};
-uint8_t current_id = 1;  // Initialize current_id as 1
-uint8_t chat_count = 0;
+unsigned int current_id = 1;  // To ensure IDs start from 1
+int chat_count = 0;  // Count of chats in the list
 
 
 void handle_400(int client_sock, const char *error_msg) {
@@ -118,7 +118,7 @@ void handle_reset(int client) {
 
     // Reset global chat count and reaction counters
     chat_count = 0;
-
+    current_id = 1;
     // Respond with an HTTP success message and an empty body
     write(client, HTTP_200_OK, strlen(HTTP_200_OK));
 }
