@@ -85,6 +85,9 @@ uint8_t add_chat(char *username, char *message) {
 }
 uint8_t add_reaction(char* username, char* reaction_message, char* id) {
 	int chat_id = atoi(id); // Convert the id string to an integer
+	if (chat_id == 0 || chat_id > chat_count) {
+        return 0;  // Error: Invalid ID
+    }
    if (strlen(username) > USERNAME_SIZE || strlen(reaction_message) > REACTION_MESSAGE_SIZE){
 	   return 0;
    }
